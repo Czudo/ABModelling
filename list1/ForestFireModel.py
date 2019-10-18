@@ -2,6 +2,7 @@ from mesa import Agent, Model
 from mesa.time import SimultaneousActivation
 from mesa.space import Grid
 from mesa.datacollection import DataCollector
+from collections import Counter
 
 
 def compute_p(model):
@@ -13,11 +14,53 @@ def compute_p(model):
         return 0
 
 
+def compute_cluster(model):
+    agents = sorted([agent for agent in model.schedule.agents], key=lambda tup: (tup.pos[0], tup.pos[1]))
+
+    largestLabel = 0
+    for agent in agents:
+        if agent.status == "empty":  # if agent was burned
+            neighbours = model.grid.get_neighbors(
+                agent.pos,
+                moore=False,
+                include_center=False)
+            neighboursDict = {x.pos: x for x in neighbours}
+            if (agent.pos[0] - 1, agent.pos[1]) in list(neighboursDict.keys()):
+                left = neighboursDict.get((agent.pos[0] - 1, agent.pos[1]))
+            else:
+                left = None
+            if (agent.pos[0], agent.pos[1] - 1) in list(neighboursDict.keys()):
+                below = neighboursDict.get((agent.pos[0], agent.pos[1]- 1))
+            else:
+                below = None
+
+            if not left and not below:
+                largestLabel += 1
+                agent.cluster = largestLabel
+            elif left and not below:
+                agent.cluster = left.cluster
+            elif not left and below:
+                agent.cluster = below.cluster
+            elif left and below:
+                minCluster = min(left.cluster, below.cluster)
+                maxCluster = max(left.cluster, below.cluster)
+
+                toChange = [x for x in agents if x.cluster == maxCluster]
+                for x in toChange:
+                    x.cluster = minCluster
+                agent.cluster = minCluster
+
+    clusters = [agent.cluster for agent in agents]
+    biggest = Counter(clusters)
+    return max(list(biggest.values()))
+
+
 class TreeAgent(Agent):
     def __init__(self, id, model, status):
         super().__init__(id, model)
         self.status = status
         self.changed = 0
+        self.cluster = None
 
     def step(self):
         if self.status == "burning":
@@ -50,6 +93,7 @@ class ForestFireModel(Model):
         self.schedule = SimultaneousActivation(self)
         self.running = True
         self.p = p
+
         for i in range(L):
             for j in range(L):
                 if self.random.random() <= self.p:
@@ -60,8 +104,7 @@ class ForestFireModel(Model):
                     self.schedule.add(tree)
                     self.grid.place_agent(tree, (i, j))
         self.datacollector = DataCollector(
-            model_reporters={"Gini": compute_p},  # `compute_p` defined above
-            agent_reporters={"Wealth": "status"})
+            model_reporters={"Gini": compute_p, "Cluster": compute_cluster})
 
     def step(self):
         self.schedule.step()

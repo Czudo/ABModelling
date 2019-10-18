@@ -21,14 +21,14 @@ def agent_portrayal(agent):
     return portrayal
 
 
-L = 100
+L = 10
 p = 0.6
 
 grid = CanvasGrid(agent_portrayal, L, L, 500, 500)
 
 server = ModularServer(ForestFireModel,
                        [grid],
-                       "Money Model",
+                       "Forest Fire Model",
                        {"L": L, "p": p})
 
 server.port = 8521  # The default
