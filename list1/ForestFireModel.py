@@ -6,18 +6,16 @@ from collections import Counter
 
 
 def compute_p(model):
-    agent_burned = [1 for agent in model.schedule.agents if agent.pos[0] == 0 and
-                    agent.status == "empty"]
-    if len(agent_burned):
-        return 1
-    else:
-        return 0
+    for agent in model.schedule.agents:
+        if agent.pos[0] == 0 and agent.status == "empty":
+            return 1
+    return 0
 
 
 def compute_cluster(model):
     agents = sorted([agent for agent in model.schedule.agents], key=lambda tup: (tup.pos[0], tup.pos[1]))
-
     largestLabel = 0
+
     for agent in agents:
         if agent.status == "empty":  # if agent was burned
             neighbours = model.grid.get_neighbors(
@@ -30,7 +28,7 @@ def compute_cluster(model):
             else:
                 left = None
             if (agent.pos[0], agent.pos[1] - 1) in list(neighboursDict.keys()):
-                below = neighboursDict.get((agent.pos[0], agent.pos[1]- 1))
+                below = neighboursDict.get((agent.pos[0], agent.pos[1] - 1))
             else:
                 below = None
 
@@ -44,15 +42,17 @@ def compute_cluster(model):
             elif left and below:
                 minCluster = min(left.cluster, below.cluster)
                 maxCluster = max(left.cluster, below.cluster)
-
-                toChange = [x for x in agents if x.cluster == maxCluster]
-                for x in toChange:
-                    x.cluster = minCluster
                 agent.cluster = minCluster
+                for temp in agents:
+                    if temp.cluster == maxCluster:
+                        temp.cluster = minCluster
 
     clusters = [agent.cluster for agent in agents]
     biggest = Counter(clusters)
-    return max(list(biggest.values()))
+    if biggest:
+        return max(list(biggest.values()))
+    else:
+        return 0
 
 
 class TreeAgent(Agent):
